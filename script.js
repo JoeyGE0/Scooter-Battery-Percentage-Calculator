@@ -66,3 +66,34 @@ function update() {
 [batteryType, voltageInput, cellMax, cellNominal, cellMin, cutoff].forEach((el) =>
   el.addEventListener("input", update)
 );
+
+// Save settings except voltage
+function saveSettings() {
+  const settings = {
+    cutoff: parseFloat(cutoffInput.value),
+    batteryType: batteryTypeSelect.value,
+    batteryRanges: batteryRanges, // assuming batteryRanges is a JS object/array in your script
+  };
+  localStorage.setItem('batterySettings', JSON.stringify(settings));
+}
+
+// Load settings on page load
+function loadSettings() {
+  const saved = localStorage.getItem('batterySettings');
+  if (saved) {
+    const settings = JSON.parse(saved);
+    if (settings.cutoff !== undefined) cutoffInput.value = settings.cutoff;
+    if (settings.batteryType) batteryTypeSelect.value = settings.batteryType;
+    if (settings.batteryRanges) batteryRanges = settings.batteryRanges;
+
+    // If you update batteryRanges visually, call updateBatteryRangesUI or equivalent here
+  }
+}
+
+// Call loadSettings() once on page start
+loadSettings();
+
+// Call saveSettings() every time a setting changes
+cutoffInput.addEventListener('change', saveSettings);
+batteryTypeSelect.addEventListener('change', saveSettings);
+// And wherever batteryRanges get updated, call saveSettings() too
