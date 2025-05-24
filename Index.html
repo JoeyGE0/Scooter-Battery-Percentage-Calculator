@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Scooter Battery Voltage to %</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Battery Voltage to Charge %</h1>
+    <p class="subtitle">Quickly convert your scooter's battery voltage into an accurate charge percentage.</p>
+
+    <div class="input-group">
+      <label for="batteryType">Battery Type:</label>
+      <select id="batteryType">
+        <option value="36">36V (10s)</option>
+        <option value="48">48V (13s)</option>
+        <option value="52">52V (14s)</option>
+        <option value="60">60V (16s)</option>
+        <option value="72">72V (20s)</option>
+        <option value="84">84V (24s)</option>
+      </select>
+    </div>
+
+    <div class="input-group">
+      <label for="voltage">Current Voltage (V):</label>
+      <input type="number" id="voltage" placeholder="Enter voltage" step="0.01" />
+    </div>
+
+    <details class="advanced-settings">
+      <summary>⚙️ Advanced Settings</summary>
+      <div>
+        <label>Cell Full (V): <input type="number" id="cellMax" value="4.2" step="0.01" /></label>
+        <label>Cell Nominal (V): <input type="number" id="cellNominal" value="3.7" step="0.01" /></label>
+        <label>Cell Empty (V): <input type="number" id="cellMin" value="3.0" step="0.01" /></label>
+        <label>Controller Cutoff (V): <input type="number" id="cutoff" value="0" step="0.1" /></label>
+      </div>
+    </details>
+
+    <div class="battery-container">
+      <div class="battery">
+        <div id="battery-fill"><span id="battery-percent">0%</span></div>
+        <div class="battery-tip"></div>
+      </div>
+    </div>
+
+    <div class="range-display" id="rangeInfo">Nominal: ~0%</div>
+    <div class="tips" id="tips"></div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
