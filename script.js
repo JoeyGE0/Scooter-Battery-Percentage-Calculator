@@ -11,31 +11,55 @@ const rangeInfo = document.getElementById("rangeInfo");
 
 let tipTimeout;
 
-function getPercentage(v, s, maxV, minV, cutoffV) {
-  if (cutoffV && v <= cutoffV) return 0;
-  const perCell = v / s;
+// Save settings to localStorage (except voltage)
+function saveSettings() {
+  const settings = {
+    batteryType: batteryType.value,
+    cellMax: cellMax.value,
+    cellNominal: cellNominal.value,
+    cellMin: cellMin.value,
+    cutoff: cutoff.value,
+  };
+  localStorage.setItem("batterySettings", JSON.stringify(settings));
+}
+
+// Load settings from localStorage
+function loadSettings() {
+  const settings = JSON.parse(localStorage.getItem("batterySettings"));
+  if (settings) {
+    batteryType.value = settings.batteryType || batteryType.value;
+    cellMax.value = settings.cellMax || cellMax.value;
+    cellNominal.value = settings.cellNominal || cellNominal.value;
+    cellMin.value = settings.cellMin || cellMin.value;
+    cutoff.value = settings.cutoff || cutoff.value;
+  }
+}
+
+function getPercentage(voltage, totalCells, maxV, minV, cutoffV) {
+  if (cutoffV && voltage <= cutoffV) return 0;
+  const perCell = voltage / totalCells;
   const clamped = Math.max(minV, Math.min(maxV, perCell));
   return Math.round(((clamped - minV) / (maxV - minV)) * 100);
 }
 
-function getBatteryTips(v, s, maxV, minV) {
-  const perCell = v / s;
+function getBatteryTips(voltage, totalCells, maxV, minV) {
+  const perCell = voltage / totalCells;
   if (perCell > maxV + 0.05) return "⚠️ Voltage too high — double check battery type or charger settings!";
-  if (perCell < minV - 0.2) return "⚠️ Battery dangerously low. Don’t charge — balance or check each cell first.";
-  if (perCell < minV) return "⚠️ Battery very low — may be unsafe to ride or charge.";
-  if (perCell < minV + 0.15) return "🔋 Very low. Avoid hard riding. Charge soon.";
+  if (perCell < minV - 0.2) return "⚠️ Voltage critically low. Battery might be damaged. Do NOT charge or ride.";
+  if (perCell < minV) return "⚠️ Voltage very low — unsafe to ride or charge.";
+  if (perCell < minV + 0.15) return "🔋 Low voltage. Charge soon and avoid heavy use.";
   if (perCell > maxV - 0.1) return "✅ Fully charged or very close.";
   return "";
 }
 
 function update() {
-  const v = parseFloat(voltageInput.value);
-  const s = Math.round(parseFloat(batteryType.value) / 3.6);
+  const voltage = parseFloat(voltageInput.value);
+  const totalCells = Math.round(parseFloat(batteryType.value) / 3.6);
   const maxV = parseFloat(cellMax.value);
   const minV = parseFloat(cellMin.value);
   const cut = parseFloat(cutoff.value) || 0;
 
-  if (isNaN(v) || v <= 0) {
+  if (isNaN(voltage) || voltage <= 0) {
     batteryPercent.innerText = "0%";
     batteryFill.style.width = "0%";
     batteryFill.style.background = "#555";
@@ -44,7 +68,7 @@ function update() {
     return;
   }
 
-  const percent = getPercentage(v, s, maxV, minV, cut);
+  const percent = getPercentage(voltage, totalCells, maxV, minV, cut);
   batteryPercent.innerText = `${percent}%`;
   batteryFill.style.width = `${percent}%`;
 
@@ -54,46 +78,28 @@ function update() {
   batteryFill.style.background = `rgb(${red},${green},60)`;
 
   // Voltage info
-  const perCell = (v / s).toFixed(2);
-  rangeInfo.innerText = `Per-cell: ${perCell} V`;
+  const perCellV = (voltage / totalCells).toFixed(2);
+  rangeInfo.innerText = `Per-cell voltage: ${perCellV} V`;
 
   clearTimeout(tipTimeout);
   tipTimeout = setTimeout(() => {
-    tips.innerText = getBatteryTips(v, s, maxV, minV);
+    tips.innerText = getBatteryTips(voltage, totalCells, maxV, minV);
   }, 1000);
+
+  saveSettings();
 }
 
-[batteryType, voltageInput, cellMax, cellNominal, cellMin, cutoff].forEach((el) =>
-  el.addEventListener("input", update)
+[batteryType, cellMax, cellNominal, cellMin, cutoff].forEach(el =>
+  el.addEventListener("input", () => {
+    update();
+    saveSettings();
+  })
 );
 
-// Save settings except voltage
-function saveSettings() {
-  const settings = {
-    cutoff: parseFloat(cutoffInput.value),
-    batteryType: batteryTypeSelect.value,
-    batteryRanges: batteryRanges, // assuming batteryRanges is a JS object/array in your script
-  };
-  localStorage.setItem('batterySettings', JSON.stringify(settings));
-}
+voltageInput.addEventListener("input", () => {
+  update();
+});
 
-// Load settings on page load
-function loadSettings() {
-  const saved = localStorage.getItem('batterySettings');
-  if (saved) {
-    const settings = JSON.parse(saved);
-    if (settings.cutoff !== undefined) cutoffInput.value = settings.cutoff;
-    if (settings.batteryType) batteryTypeSelect.value = settings.batteryType;
-    if (settings.batteryRanges) batteryRanges = settings.batteryRanges;
-
-    // If you update batteryRanges visually, call updateBatteryRangesUI or equivalent here
-  }
-}
-
-// Call loadSettings() once on page start
+// Load saved settings on page load
 loadSettings();
-
-// Call saveSettings() every time a setting changes
-cutoffInput.addEventListener('change', saveSettings);
-batteryTypeSelect.addEventListener('change', saveSettings);
-// And wherever batteryRanges get updated, call saveSettings() too
+update();
