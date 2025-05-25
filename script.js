@@ -46,12 +46,22 @@ function loadSettings() {
 
 function update() {
   const v = parseFloat(voltageInput.value);
-  const s = parseFloat(batteryType.value) / 3.6;  // FIXED: no rounding
   const maxV = parseFloat(cellMax.value);
   const minV = parseFloat(cellMin.value);
   const cut = parseFloat(cutoff.value) || 0;
 
-  if (isNaN(v) || v <= 0) {
+  const seriesCountMap = {
+    "36": 10,
+    "48": 13,
+    "52": 14,
+    "60": 16,
+    "72": 20,
+    "84": 24
+  };
+
+  const s = seriesCountMap[batteryType.value];
+
+  if (isNaN(v) || v <= 0 || !s) {
     batteryPercent.innerText = "0%";
     batteryFill.style.width = "0%";
     batteryFill.style.background = "#555";
@@ -60,17 +70,18 @@ function update() {
     return;
   }
 
-  const percent = getPercentage(v, s, maxV, minV, cut);
+  const perCell = v / s;
+  const clamped = Math.max(minV, Math.min(maxV, perCell));
+  const percent = v <= cut ? 0 : Math.round(((clamped - minV) / (maxV - minV)) * 100);
+
   batteryPercent.innerText = `${percent}%`;
   batteryFill.style.width = `${percent}%`;
 
-  // Smooth gradient colour based on percent
   const green = Math.round((percent / 100) * 200);
   const red = 200 - green;
   batteryFill.style.background = `rgb(${red},${green},60)`;
 
-  const perCell = (v / s).toFixed(2);
-  rangeInfo.innerText = `Per-cell: ${perCell} V`;
+  rangeInfo.innerText = `Per-cell: ${perCell.toFixed(2)} V`;
 
   clearTimeout(tipTimeout);
   tipTimeout = setTimeout(() => {
