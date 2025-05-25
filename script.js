@@ -74,7 +74,9 @@ function update() {
   const clamped = Math.max(minV, Math.min(maxV, perCell));
   
 
-  const percent = Math.max(0, Math.round(((clamped - (cut / s)) / (maxV - (cut / s))) * 100));
+  const percent = cut > 0
+  ? Math.max(0, Math.round(((clamped - (cut / s)) / (maxV - (cut / s))) * 100))
+  : Math.round(((clamped - minV) / (maxV - minV)) * 100);
 
   batteryPercent.innerText = `${percent}%`;
   batteryFill.style.width = `${percent}%`;
