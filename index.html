@@ -1,54 +1,234 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Scooter Battery Voltage to %</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Battery Voltage Calculator 🔋</title>
   <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
-  <div class="container">
-    <h1>Battery Voltage to Charge %</h1>
-    <p class="subtitle">Quickly convert your scooter's battery voltage into an accurate charge percentage.</p>
-
-    <div class="input-group">
-      <label for="batteryType">Battery Type:</label>
-      <select id="batteryType">
-        <option value="36">36V (10s)</option>
-        <option value="48">48V (13s)</option>
-        <option value="52">52V (14s)</option>
-        <option value="60">60V (16s)</option>
-        <option value="72">72V (20s)</option>
-        <option value="84">84V (24s)</option>
-      </select>
-    </div>
-
-    <div class="input-group">
-      <label for="voltage">Current Voltage (V):</label>
-      <input type="number" id="voltage" placeholder="Enter voltage" step="0.01" />
-    </div>
-
-    <details class="advanced-settings">
-      <summary>⚙️ Advanced Settings</summary>
-      <div>
-        <label>Cell Full (V): <input type="number" id="cellMax" value="4.2" step="0.01" /></label>
-        <label>Cell Nominal (V) | Unused: <input type="number" id="cellNominal" value="3.7" step="0.01" /></label>
-        <label>Cell Empty (V): <input type="number" id="cellMin" value="3.0" step="0.01" /></label>
-        <label>Controller Cutoff (V): <input type="number" id="cutoff" value="0" step="0.1" /></label>
+  <div class="app">
+    <header class="header">
+      <div class="container">
+        <h1>🔋 Battery Calculator</h1>
+        <p class="subtitle">Convert your scooter's voltage to percentage with smart insights</p>
       </div>
-    </details>
+    </header>
 
-    <div class="battery-container">
-      <div class="battery">
-        <div id="battery-fill"><span id="battery-percent">0%</span></div>
-        <div class="battery-tip"></div>
+    <main class="main">
+      <div class="container">
+        <div class="main-content">
+          <div class="calculator-card">
+            <!-- Battery Type Selection -->
+            <div class="input-group">
+              <label for="batteryType">Battery Type</label>
+              <div class="select-wrapper">
+                <select id="batteryType">
+                  <option value="36">36V Battery</option>
+                  <option value="48">48V Battery</option>
+                  <option value="52">52V Battery</option>
+                  <option value="60">60V Battery</option>
+                  <option value="72" selected>72V Battery</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Voltage Input -->
+            <div class="input-group">
+              <label for="voltageInput">Current Voltage</label>
+              <div class="input-wrapper">
+                <input type="number" id="voltageInput" step="0.1" placeholder="e.g. 79.2" />
+                <span class="unit">V</span>
+              </div>
+            </div>
+
+            <!-- Battery Display -->
+            <div class="battery-section">
+              <div class="battery-container">
+                <div class="battery">
+                  <div class="battery-fill" id="batteryFill">
+                    <span id="batteryPercent">0%</span>
+                  </div>
+                  <div class="battery-terminal"></div>
+                </div>
+                <div class="battery-info">
+                  <div class="voltage-display" id="voltageDisplay">-- V</div>
+                  <div class="status-text" id="statusText">Enter voltage to start</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Advanced Settings -->
+            <div class="advanced-section">
+              <button class="advanced-toggle" id="advancedToggle" onclick="toggleAdvanced()">
+                <span class="toggle-icon">⚙️</span>
+                <span class="toggle-text">Advanced Settings</span>
+                <span class="toggle-arrow">▼</span>
+              </button>
+
+              <div class="advanced-panel" id="advancedPanel">
+                <div class="advanced-grid">
+                  <div class="input-group">
+                    <label for="cellMax">Max Cell Voltage</label>
+                    <input type="number" id="cellMax" value="4.2" step="0.01" />
+                  </div>
+                  <div class="input-group">
+                    <label for="cellNominal">Nominal Cell Voltage</label>
+                    <input type="number" id="cellNominal" value="3.7" step="0.01" />
+                  </div>
+                  <div class="input-group">
+                    <label for="cellMin">Min Cell Voltage</label>
+                    <input type="number" id="cellMin" value="3.0" step="0.01" />
+                  </div>
+                  <div class="input-group">
+                    <label for="controllerCutoff">Controller Cutoff (V)</label>
+                    <input type="number" id="controllerCutoff" value="0" step="0.1" placeholder="e.g. 60.0" />
+                    <small style="color: #a0aec0; font-size: 0.8rem; margin-top: 0.25rem; display: block;">
+                      Voltage when scooter stops (for accurate % calculation)
+                    </small>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tips and Warnings -->
+            <div class="tips-section">
+              <div class="tip-card" id="tipCard">
+                <div class="tip-icon" id="tipIcon">💡</div>
+                <div class="tip-content">
+                  <div class="tip-title" id="tipTitle">Ready to calculate</div>
+                  <div class="tip-text" id="tipText">Enter your battery voltage above to get started</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
-    </div>
+  </div>
 
-    <div class="range-display" id="rangeInfo">Nominal: ~0%</div>
-    <div class="tips" id="tips"></div>
+  <!-- Quick Reference -->
+  <div class="reference-card">
+    <h3>Quick Reference</h3>
+    <div class="reference-grid" id="referenceGrid">
+      <!-- Will be populated by JavaScript -->
+    </div>
+  </div>
+
+  <!-- Battery & Scooter Tips Guide -->
+  <div class="guide-card">
+    <h3>Battery & Scooter Tips Guide</h3>
+    <div class="guide">
+      <details class="guide-item">
+        <summary>Overcharge scenarios</summary>
+        <div class="guide-content">
+          <ul>
+            <li><strong>Slightly overcharged</strong> (≤ about +0.05V per cell, or ≤ ~2% above pack full): often
+              surface charge right after charging; let the pack rest 15–30 min and it should settle.
+              Calibrate/verify charger if this happens often.</li>
+            <li><strong>Over full charge</strong> (~+2–10% over expected full, or ~+0.05–0.10V per cell): unplug
+              immediately; let rest; avoid hard riding until it settles. Check charger output and BMS balancing.
+            </li>
+            <li><strong>Dangerously overcharged</strong> (> ~+0.10V per cell, typically > 4.30V/cell): stop
+              using;
+              DO NOT charge; move to a non-flammable area; inspect wiring/charger and seek service.</li>
+          </ul>
+          <p>Tip: Use only the manufacturer-approved charger. Lithium-ion uses CC/CV charging and should not be
+            pushed above the rated max (typically 4.20V/cell).</p>
+        </div>
+      </details>
+
+      <details class="guide-item">
+        <summary>Undercharge / discharge scenarios</summary>
+        <div class="guide-content">
+          <ul>
+            <li><strong>Healthy low</strong> (~40–60%): fine for storage; normal for day-to-day use.</li>
+            <li><strong>Low</strong> (~20–40%): rideable with reduced performance; plan to charge soon.</li>
+            <li><strong>Very low</strong> (~10–20%): voltage sag increases under load; avoid steep hills; charge
+              soon.</li>
+            <li><strong>Near cutoff</strong> (0–10%): scooter may shut off suddenly under load; charge now.</li>
+            <li><strong>Deeply discharged</strong> (roughly &lt; ~3.0V/cell equivalent; severe &lt; ~2.5V/cell):
+              cells may be damaged. Do not continue riding. Charging could be unsafe if cells are severely
+              depleted—seek professional advice.</li>
+          </ul>
+          <p>Set <strong>Controller Cutoff</strong> in Advanced if your scooter shuts off early. It does not
+            change the actual voltage—only the 0% baseline for more accurate %.</p>
+        </div>
+      </details>
+
+      <details class="guide-item">
+        <summary>Temperature and charging</summary>
+        <div class="guide-content">
+          <ul>
+            <li><strong>Best charging temp</strong>: about 10–30°C. Avoid charging below 0°C (risk of lithium
+              plating) or above ~45°C (accelerated degradation).</li>
+            <li><strong>Riding in cold</strong>: expect less range and more voltage sag. Warm the pack indoors
+              before charging.</li>
+            <li><strong>Heat</strong>: avoid leaving the scooter in hot cars or direct sun; high heat shortens
+              lifespan.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="guide-item">
+        <summary>Storage</summary>
+        <div class="guide-content">
+          <ul>
+            <li><strong>State of charge</strong>: store around 40–60% and in a cool, dry place (~10–25°C).</li>
+            <li><strong>Periodic checks</strong>: top up every 1–2 months if it drifts low; never store
+              long-term
+              at 0% or 100%.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="guide-item">
+        <summary>Measuring and interpreting voltage</summary>
+        <div class="guide-content">
+          <ul>
+            <li><strong>Measure at rest</strong>: after charging/riding, let the pack rest 15–30 min to reduce
+              surface charge or rebound effects.</li>
+            <li><strong>Voltage sag</strong>: under load, voltage dips; this is normal. The % here assumes
+              resting
+              voltage.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="guide-item">
+        <summary>Charger and BMS tips</summary>
+        <div class="guide-content">
+          <ul>
+            <li>Use the correct charger and verify its output voltage matches your pack.</li>
+            <li>Occasionally charge to 100% and let rest so the BMS can balance cells. For longevity, daily
+              charging to ~80–90% is common.</li>
+            <li>Do not leave on the charger for days; unplug after it reaches full.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="guide-item">
+        <summary>Safety and damage checks</summary>
+        <div class="guide-content">
+          <ul>
+            <li>Stop using the battery if you notice <strong>swelling, hissing, strong odor, smoke, or unusual
+                heat</strong>. Isolate in a non-flammable area and seek service.</li>
+            <li>If the scooter or battery gets wet, <strong>do not charge</strong> until fully dry. Water can
+              corrode connectors and cause shorts.</li>
+            <li>Transport and store away from flammable materials. Never puncture or crush cells.</li>
+          </ul>
+        </div>
+      </details>
+    </div>
+  </div>
+  </div>
+  </div>
+  </main>
   </div>
 
   <script src="script.js"></script>
 </body>
+
 </html>
