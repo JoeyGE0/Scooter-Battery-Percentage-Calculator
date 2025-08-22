@@ -3,3 +3,6 @@ A way to accurately determine battery percentage from voltage.
 
 
 https://joeyge0.github.io/Scooter-Battery-Percentage-Calculator/
+
+
+many bugs so please please please use carefully
