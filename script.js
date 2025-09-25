@@ -46,7 +46,12 @@ function init() {
   
   // Add event listeners
   voltageInput.addEventListener("input", updateBattery);
-  batteryType.addEventListener("change", updateBattery);
+  batteryType.addEventListener("change", () => {
+    // Clear current voltage when switching battery types
+    voltageInput.value = "";
+    updateBattery();
+    updateVoltagePlaceholder();
+  });
   cellMax.addEventListener("input", updateBattery);
   cellNominal.addEventListener("input", updateBattery);
   cellMin.addEventListener("input", updateBattery);
@@ -57,6 +62,39 @@ function init() {
   
   // Focus on voltage input for better UX
   voltageInput.focus();
+}
+
+// Update voltage placeholder based on current battery type
+function updateVoltagePlaceholder() {
+  const lastVoltages = JSON.parse(localStorage.getItem("batteryLastVoltages") || "{}");
+  const lastVoltageForType = lastVoltages[batteryType.value];
+  
+  if (lastVoltageForType) {
+    voltageInput.placeholder = `e.g. ${lastVoltageForType}V`;
+  } else {
+    // Show nominal voltage for this battery type as default example
+    const config = batteryConfigs[parseInt(batteryType.value)];
+    const nominalVoltage = config.nominal;
+    voltageInput.placeholder = `e.g. ${nominalVoltage}V`;
+  }
+}
+
+// Update voltage input styling for dangerous undercharge
+function updateVoltageInputStyling(voltage, vMin, vMax) {
+  // Check for dangerously low voltage (same thresholds as the tips)
+  const isDangerouslyLow = voltage < vMin * 0.90 || voltage < vMax * 0.25;
+  
+  if (isDangerouslyLow) {
+    // Red outline with pulsing for dangerous undercharge
+    voltageInput.style.borderColor = "#f56565";
+    voltageInput.style.boxShadow = "0 0 0 4px rgba(245, 101, 101, 0.3), 0 0 20px rgba(245, 101, 101, 0.5)";
+    voltageInput.style.animation = "dangerPulse 1s infinite";
+  } else {
+    // Normal - reset styling
+    voltageInput.style.borderColor = "";
+    voltageInput.style.boxShadow = "";
+    voltageInput.style.animation = "none";
+  }
 }
 
 // Toggle advanced settings
@@ -100,7 +138,7 @@ function updateBattery() {
     voltageDisplay.textContent = "-- V";
   }
   
-  // Calculate percentage
+  // Calculate percentage using more accurate lithium battery curve
   let percent = 0;
   let status = "Enter voltage to start";
   
@@ -112,7 +150,24 @@ function updateBattery() {
       percent = 0;
       status = "Below minimum voltage";
     } else {
-      percent = Math.min(Math.max(((voltage - vMin) / (vMax - vMin)) * 100, 0), 100);
+      // More accurate lithium battery percentage calculation
+      // Uses a curve that better matches real lithium battery behavior
+      const voltageRange = vMax - vMin;
+      const voltageRatio = (voltage - vMin) / voltageRange;
+      
+      // Apply curve correction for lithium batteries
+      // Higher voltages (above 3.7V/cell) have steeper drops
+      // Lower voltages (below 3.7V/cell) have more gradual drops
+      let correctedRatio;
+      if (voltageRatio > 0.5) {
+        // Above 50% - steeper curve
+        correctedRatio = 0.5 + (voltageRatio - 0.5) * 1.2;
+      } else {
+        // Below 50% - more gradual curve
+        correctedRatio = voltageRatio * 0.8;
+      }
+      
+      percent = Math.min(Math.max(correctedRatio * 100, 0), 100);
       status = getStatusText(percent, voltage, vNominal);
     }
   }
@@ -124,6 +179,9 @@ function updateBattery() {
   
   // Update battery color based on percentage
   updateBatteryColor(percent);
+  
+  // Update voltage input styling for dangerous undercharge
+  updateVoltageInputStyling(voltage, vMin, vMax);
   
   // Update tips with delay to avoid flicker
   clearTimeout(tipTimeout);
@@ -181,16 +239,18 @@ function updateBatteryColor(percent) {
 // Update tips based on battery state
 function updateTips(voltage, percent, vMin, vMax, vNominal) {
   let icon, title, text, type = "info";
+  let showTroubleshootButton = false;
   
   if (isNaN(voltage)) {
     icon = "💡";
     title = "Ready to calculate";
     text = "Enter your battery voltage above to get started";
   } else if (voltage <= 0) {
-    icon = "❌";
-    title = "Invalid voltage";
-    text = "Voltage must be greater than 0V. Check your multimeter or voltage reading.";
+    icon = "🔋";
+    title = "BMS Protection or No Connection";
+    text = "0V reading could mean BMS has cut off power to protect cells, or there's no connection. Check connections and see troubleshooting guide for recovery methods.";
     type = "warning";
+    showTroubleshootButton = true;
   } else if (voltage > 120) {
     icon = "🚨";
     title = "DANGER - Extremely high voltage";
@@ -261,11 +321,13 @@ function updateTips(voltage, percent, vMin, vMax, vNominal) {
     title = "DANGER - Very low";
     text = "Voltage is dangerously low. Charging may be unsafe. Check each cell individually before attempting to charge.";
     type = "warning";
+    showTroubleshootButton = true;
   } else if (voltage >= vMax * 0.25) {
     icon = "🚨";
     title = "DANGER - Severely low";
     text = "Voltage is severely low. Cells may be permanently damaged. Charging could be dangerous - seek professional advice.";
     type = "warning";
+    showTroubleshootButton = true;
   } else if (voltage >= vMin) {
     icon = "🚨";
     title = "Near cutoff";
@@ -281,26 +343,31 @@ function updateTips(voltage, percent, vMin, vMax, vNominal) {
     title = "Severely discharged";
     text = "Voltage is severely low. Battery cells may be damaged. Check each cell individually.";
     type = "warning";
+    showTroubleshootButton = true;
   } else if (voltage >= vMin * 0.90) {
     icon = "🚨";
     title = "CRITICAL - Deeply discharged";
     text = "Voltage is critically low. Cells may be permanently damaged. Charging could be unsafe.";
     type = "warning";
+    showTroubleshootButton = true;
   } else if (voltage >= vMin * 0.85) {
     icon = "🚨";
     title = "DANGER - Extremely discharged";
     text = "Voltage is extremely low. Charging this battery could be dangerous. Seek professional advice.";
     type = "warning";
+    showTroubleshootButton = true;
   } else if (voltage >= vMin * 0.80) {
     icon = "🚨";
     title = "DANGER - Battery may be destroyed";
     text = "Voltage is critically low. Battery may be permanently damaged and unsafe to charge.";
     type = "warning";
+    showTroubleshootButton = true;
   } else {
-    icon = "🚨";
-    title = "DANGER - DO NOT CHARGE";
-    text = "Voltage is extremely low. Charging this battery could cause fire or explosion. Battery is likely destroyed.";
+    icon = "🔋";
+    title = "Battery Protection Active";
+    text = "Voltage is extremely low. This could be BMS protection mode or a severely discharged battery. Check the troubleshooting guide to determine if it's safe to attempt recovery.";
     type = "warning";
+    showTroubleshootButton = true;
   }
   
   // Update tip card
@@ -310,6 +377,33 @@ function updateTips(voltage, percent, vMin, vMax, vNominal) {
   
   // Update tip card styling
   tipCard.className = `tip-card ${type}`;
+  
+  // Add troubleshoot button if needed
+  if (showTroubleshootButton) {
+    if (!document.getElementById('troubleshootBtn')) {
+      const troubleshootBtn = document.createElement('button');
+      troubleshootBtn.id = 'troubleshootBtn';
+      troubleshootBtn.className = 'troubleshoot-btn';
+      troubleshootBtn.innerHTML = '🔧 Jumpstart & BMS Guide';
+      troubleshootBtn.onclick = () => {
+        const jumpstartGuide = document.getElementById('jumpstart-guide');
+        if (jumpstartGuide) {
+          jumpstartGuide.scrollIntoView({ behavior: 'smooth' });
+          // Open the first details section
+          const firstDetails = jumpstartGuide.querySelector('details');
+          if (firstDetails) {
+            firstDetails.open = true;
+          }
+        }
+      };
+      tipCard.appendChild(troubleshootBtn);
+    }
+  } else {
+    const existingBtn = document.getElementById('troubleshootBtn');
+    if (existingBtn) {
+      existingBtn.remove();
+    }
+  }
 }
 
 // Generate reference grid with common voltage points
@@ -373,6 +467,13 @@ function saveSettings() {
     isAdvancedOpen: isAdvancedOpen
   };
   
+  // Save last voltage for current battery type
+  if (voltageInput.value) {
+    const lastVoltages = JSON.parse(localStorage.getItem("batteryLastVoltages") || "{}");
+    lastVoltages[batteryType.value] = voltageInput.value;
+    localStorage.setItem("batteryLastVoltages", JSON.stringify(lastVoltages));
+  }
+  
   localStorage.setItem("batteryCalcSettings", JSON.stringify(settings));
 }
 
@@ -383,7 +484,10 @@ function loadSettings() {
     try {
       const settings = JSON.parse(saved);
       
-      batteryType.value = settings.batteryType || "72";
+      // Set battery type first, then update the display
+      if (settings.batteryType) {
+        batteryType.value = settings.batteryType;
+      }
       cellMax.value = settings.cellMax || "4.2";
       cellNominal.value = settings.cellNominal || "3.7";
       cellMin.value = settings.cellMin || "3.0";
@@ -392,8 +496,22 @@ function loadSettings() {
       if (settings.isAdvancedOpen) {
         toggleAdvanced();
       }
+      
+      // Set last voltage as placeholder for this specific battery type
+      const lastVoltages = JSON.parse(localStorage.getItem("batteryLastVoltages") || "{}");
+      const lastVoltageForType = lastVoltages[settings.batteryType];
+      if (lastVoltageForType) {
+        voltageInput.placeholder = `e.g. ${lastVoltageForType}V`;
+      } else {
+        // Show nominal voltage as default
+        const config = batteryConfigs[parseInt(settings.batteryType)];
+        voltageInput.placeholder = `e.g. ${config.nominal}V`;
+      }
+      
+      // Update the battery display after loading settings
+      updateBattery();
     } catch (e) {
-      console.log("Could not load saved settings");
+      // Could not load saved settings
     }
   }
 }
@@ -459,5 +577,390 @@ function addInputValidation() {
   });
 }
 
+// Camera OCR functionality
+let cameraStream = null;
+let autoScanInterval = null;
+let lastDetectedVoltage = null;
+
+async function openCamera() {
+  const modal = document.getElementById('cameraModal');
+  const video = document.getElementById('cameraVideo');
+  const result = document.getElementById('scanResult');
+  
+  try {
+    // Request camera access
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { 
+        facingMode: 'environment', // Use back camera if available
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      }
+    });
+    
+    video.srcObject = cameraStream;
+    modal.classList.add('active');
+    result.innerHTML = '🔍 Looking for voltage display...';
+    result.className = 'scan-result';
+    
+    // Start auto-scanning after camera loads
+    video.onloadedmetadata = () => {
+      startAutoCapture();
+    };
+    
+  } catch (error) {
+    alert('Camera access denied or not available. Please allow camera access and try again.');
+  }
+}
+
+function closeCamera() {
+  const modal = document.getElementById('cameraModal');
+  const video = document.getElementById('cameraVideo');
+  
+  // Stop auto-scanning
+  stopAutoCapture();
+  
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(track => track.stop());
+    cameraStream = null;
+  }
+  
+  video.srcObject = null;
+  modal.classList.remove('active');
+}
+
+function startAutoCapture() {
+  const result = document.getElementById('scanResult');
+  result.innerHTML = '🔍 Auto-scanning for voltage...';
+  result.className = 'scan-result';
+  
+  // Scan every 2 seconds
+  autoScanInterval = setInterval(async () => {
+    await performAutoScan();
+  }, 2000);
+}
+
+function stopAutoCapture() {
+  if (autoScanInterval) {
+    clearInterval(autoScanInterval);
+    autoScanInterval = null;
+  }
+  lastDetectedVoltage = null;
+}
+
+async function performAutoScan() {
+  const video = document.getElementById('cameraVideo');
+  const canvas = document.getElementById('captureCanvas');
+  const result = document.getElementById('scanResult');
+  
+  if (!video.videoWidth || !video.videoHeight) return;
+  
+  try {
+    // Set canvas size to match video
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    // Capture current frame
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+    
+    // Convert to data URL for OCR
+    const imageData = canvas.toDataURL('image/jpeg', 0.6);
+    
+    // Quick OCR check
+    const voltage = await performQuickOCR(imageData);
+    
+    if (voltage && voltage !== lastDetectedVoltage) {
+      // New voltage detected!
+      lastDetectedVoltage = voltage;
+      result.innerHTML = `✅ Auto-detected: ${voltage}V - Click "Save Voltage" to use this reading`;
+      result.className = 'scan-result success';
+      
+      // Store the detected voltage for the save button
+      window.detectedVoltage = voltage;
+      
+    } else if (voltage === lastDetectedVoltage) {
+      // Same voltage detected - stable reading
+      result.innerHTML = `🎯 Stable reading: ${voltage}V - Click "Save Voltage" to confirm`;
+      result.className = 'scan-result success';
+      
+    } else {
+      // No voltage detected
+      result.innerHTML = '🔍 Auto-scanning... Position multimeter display in view';
+      result.className = 'scan-result';
+    }
+    
+  } catch (error) {
+    // Silent fail during auto-scanning
+  }
+}
+
+async function performQuickOCR(imageData) {
+  try {
+    const response = await fetch(imageData);
+    const blob = await response.blob();
+    
+    const formData = new FormData();
+    formData.append('file', blob, 'image.jpg');
+    formData.append('apikey', 'helloworld');
+    formData.append('OCREngine', '1'); // Faster engine for live detection
+    formData.append('scale', 'true');
+    
+    const ocrResponse = await fetch('https://api.ocr.space/parse/image', {
+      method: 'POST',
+      body: formData
+    });
+    
+    const ocrData = await ocrResponse.json();
+    
+    if (ocrData.OCRExitCode === 1 && ocrData.ParsedResults?.[0]?.ParsedText) {
+      const text = ocrData.ParsedResults[0].ParsedText;
+      return extractVoltageFromText(text);
+    }
+    
+    return null;
+    
+  } catch (error) {
+    return null;
+  }
+}
+
+async function captureAndAnalyze() {
+  const result = document.getElementById('scanResult');
+  
+  // Check if we have an auto-detected voltage
+  if (window.detectedVoltage) {
+    // Use the auto-detected voltage
+    voltageInput.value = window.detectedVoltage;
+    updateBattery();
+    result.innerHTML = `✅ Saved voltage: ${window.detectedVoltage}V`;
+    result.className = 'scan-result success';
+    
+    // Close camera after short delay
+    setTimeout(() => {
+      closeCamera();
+    }, 1000);
+    
+  } else {
+    // No auto-detected voltage, try manual OCR
+    const video = document.getElementById('cameraVideo');
+    const canvas = document.getElementById('captureCanvas');
+    
+    try {
+      // Set canvas size to match video
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      
+      // Capture the current frame
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0);
+      
+      result.innerHTML = 'Analyzing image with OCR...';
+      result.className = 'scan-result';
+      
+      // Convert canvas to data URL and send to OCR API
+      const imageData = canvas.toDataURL('image/jpeg', 0.8);
+      
+      // Try OCR.Space API with better settings
+      const ocrResult = await performOCR(imageData);
+      
+      if (ocrResult) {
+        // Success - set the voltage and close camera
+        voltageInput.value = ocrResult;
+        updateBattery();
+        result.innerHTML = `✅ Found voltage: ${ocrResult}V`;
+        result.className = 'scan-result success';
+        
+        // Close camera after short delay
+        setTimeout(() => {
+          closeCamera();
+        }, 1500);
+        
+      } else {
+        // Show manual fallback
+        showManualInput(result);
+      }
+      
+    } catch (error) {
+      // Show manual fallback on error
+      showManualInput(result);
+    }
+  }
+}
+
+function showManualInput(result) {
+  result.innerHTML = `
+    <div style="text-align: center;">
+      <p>🤖 OCR couldn't read the display</p>
+      <p>Enter the voltage you see:</p>
+      <input type="number" id="manualVoltageInput" step="0.1" style="
+        padding: 0.5rem; 
+        border: 2px solid #667eea; 
+        border-radius: 8px; 
+        font-size: 1rem; 
+        width: 120px; 
+        background: #1a202c; 
+        color: #e2e8f0;
+        text-align: center;
+        margin: 0.5rem;
+      " placeholder="78.5" autofocus>
+      <button onclick="setManualVoltage()" style="
+        padding: 0.5rem 1rem; 
+        background: #48bb78; 
+        color: white; 
+        border: none; 
+        border-radius: 8px; 
+        cursor: pointer; 
+        margin-left: 0.5rem;
+        font-weight: 600;
+      ">Set Voltage</button>
+    </div>
+  `;
+  result.className = 'scan-result';
+}
+
+async function performOCR(imageData) {
+  try {
+    // Convert data URL to blob
+    const response = await fetch(imageData);
+    const blob = await response.blob();
+    
+    // Create form data for OCR.Space API
+    const formData = new FormData();
+    formData.append('file', blob, 'image.jpg');
+    formData.append('apikey', 'helloworld'); // Free tier API key
+    formData.append('OCREngine', '2');
+    formData.append('detectOrientation', 'true');
+    formData.append('scale', 'true');
+    
+    // Call OCR.Space API
+    const ocrResponse = await fetch('https://api.ocr.space/parse/image', {
+      method: 'POST',
+      body: formData
+    });
+    
+    const ocrData = await ocrResponse.json();
+    
+    if (ocrData.OCRExitCode === 1 && ocrData.ParsedResults?.[0]?.ParsedText) {
+      const text = ocrData.ParsedResults[0].ParsedText;
+      return extractVoltageFromText(text);
+    }
+    
+    return null;
+    
+  } catch (error) {
+    return null;
+  }
+}
+
+function setManualVoltage() {
+  const manualInput = document.getElementById('manualVoltageInput');
+  const voltage = parseFloat(manualInput.value);
+  const result = document.getElementById('scanResult');
+  
+  if (voltage && voltage > 0) {
+    // Success - set the voltage and close camera
+    voltageInput.value = voltage;
+    updateBattery();
+    result.innerHTML = `✅ Voltage set: ${voltage}V`;
+    result.className = 'scan-result success';
+    
+    // Close camera after short delay
+    setTimeout(() => {
+      closeCamera();
+    }, 1000);
+    
+  } else {
+    result.innerHTML = '❌ Please enter a valid voltage value.';
+    result.className = 'scan-result error';
+  }
+}
+
+function extractVoltageFromText(text) {
+  if (!text || typeof text !== 'string') return null;
+  
+  // Remove all non-numeric characters except dots and spaces
+  const cleanText = text.replace(/[^\d\.\s]/g, ' ').trim();
+  
+  // Look for valid voltage patterns - be very specific
+  const voltagePatterns = [
+    /\b(\d{1,2}\.\d{1,3})\b/g,    // 1-2 digits, dot, 1-3 decimals (e.g., 78.5, 4.25)
+    /\b(\d{2,3})\b/g              // 2-3 digit whole numbers (e.g., 78, 84)
+  ];
+  
+  const potentialVoltages = [];
+  
+  for (const pattern of voltagePatterns) {
+    let match;
+    while ((match = pattern.exec(cleanText)) !== null) {
+      const voltage = parseFloat(match[1]);
+      
+      // Additional validation
+      if (isValidVoltage(voltage)) {
+        potentialVoltages.push(voltage);
+      }
+    }
+  }
+  
+  if (potentialVoltages.length > 0) {
+    // Remove duplicates and sort
+    const uniqueVoltages = [...new Set(potentialVoltages)].sort((a, b) => a - b);
+    
+    // Return the most likely voltage
+    if (uniqueVoltages.length === 1) {
+      return uniqueVoltages[0];
+    } else {
+      // If multiple voltages, prefer ones in typical battery ranges
+      const preferredVoltages = uniqueVoltages.filter(v => 
+        (v >= 30 && v <= 90) || // Typical battery pack voltages
+        (v >= 3.0 && v <= 4.5)  // Single cell voltages
+      );
+      
+      if (preferredVoltages.length > 0) {
+        return preferredVoltages[Math.floor(preferredVoltages.length / 2)];
+      } else {
+        return uniqueVoltages[Math.floor(uniqueVoltages.length / 2)];
+      }
+    }
+  }
+  
+  return null;
+}
+
+function isValidVoltage(voltage) {
+  // Must be a valid number
+  if (!voltage || isNaN(voltage) || !isFinite(voltage)) {
+    return false;
+  }
+  
+  // Must be positive
+  if (voltage <= 0) {
+    return false;
+  }
+  
+  // Must be in reasonable voltage ranges for batteries
+  const isInValidRange = 
+    (voltage >= 1.0 && voltage <= 5.0) ||    // Single cell range (1.0V - 5.0V)
+    (voltage >= 10.0 && voltage <= 100.0);   // Battery pack range (10V - 100V)
+  
+  if (!isInValidRange) {
+    return false;
+  }
+  
+  // Reject obvious non-voltage numbers
+  const invalidPatterns = [
+    voltage.toString().length > 5,           // Too many digits
+    voltage === Math.floor(voltage) && voltage < 10, // Single digit whole numbers
+    voltage > 99.999                         // Unrealistically high
+  ];
+  
+  if (invalidPatterns.some(invalid => invalid)) {
+    return false;
+  }
+  
+  return true;
+}
+
 // Initialize when DOM is loaded
 document.addEventListener("DOMContentLoaded", init);
+
+// Simplified camera feature - manual entry after photo capture
