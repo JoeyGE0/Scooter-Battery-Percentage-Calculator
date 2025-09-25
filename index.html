@@ -41,6 +41,32 @@
               <div class="input-wrapper">
                 <input type="number" id="voltageInput" step="0.1" placeholder="e.g. 79.2" />
                 <span class="unit">V</span>
+                <button type="button" class="camera-btn" id="cameraBtn" onclick="openCamera()"
+                  title="Scan voltage from multimeter">
+                  📷
+                </button>
+              </div>
+            </div>
+
+            <!-- Hidden camera elements -->
+            <div id="cameraModal" class="camera-modal">
+              <div class="camera-content">
+                <div class="camera-header">
+                  <h3>📷 Scan Multimeter Display</h3>
+                  <button class="close-btn" onclick="closeCamera()">✕</button>
+                </div>
+                <div class="camera-preview">
+                  <video id="cameraVideo" autoplay playsinline></video>
+                  <canvas id="captureCanvas" style="display: none;"></canvas>
+                </div>
+                <div class="camera-instructions">
+                  <p>Position your multimeter display in the camera view and tap capture</p>
+                </div>
+                <div class="camera-controls">
+                  <button class="capture-btn" onclick="captureAndAnalyze()">💾 Save Voltage</button>
+                  <button class="cancel-btn" onclick="closeCamera()">Cancel</button>
+                </div>
+                <div id="scanResult" class="scan-result"></div>
               </div>
             </div>
 
@@ -218,6 +244,138 @@
             <li>If the scooter or battery gets wet, <strong>do not charge</strong> until fully dry. Water can
               corrode connectors and cause shorts.</li>
             <li>Transport and store away from flammable materials. Never puncture or crush cells.</li>
+          </ul>
+        </div>
+      </details>
+    </div>
+  </div>
+
+  <!-- Jumpstart & BMS Troubleshooting Guide -->
+  <div class="guide-card" id="jumpstart-guide">
+    <h3>🔧 Jumpstart & BMS Troubleshooting Guide</h3>
+    <div class="guide">
+      <details class="guide-item">
+        <summary>Battery Protection & BMS Sleep Mode</summary>
+        <div class="guide-content">
+          <p><strong>When your battery shows very low voltage, it could be:</strong></p>
+          <ul>
+            <li><strong>BMS Protection</strong> - Battery Management System has cut off power to protect cells</li>
+            <li><strong>Sleep Mode</strong> - BMS has entered low-power mode to prevent further discharge</li>
+            <li><strong>Cell Imbalance</strong> - One or more cells are severely discharged while others are fine</li>
+            <li><strong>BMS Failure</strong> - The protection circuit itself has failed</li>
+            <li><strong>Dead Pack</strong> - Cells are permanently damaged and unsafe</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="guide-item">
+        <summary>How to Check if Battery is Safe to Jumpstart</summary>
+        <div class="guide-content">
+          <p><strong>Before attempting any recovery:</strong></p>
+          <ul>
+            <li><strong>Check for physical damage</strong> - swelling, cracks, leaks, or heat damage</li>
+            <li><strong>Measure individual cell voltages</strong> - if you have access to the BMS balance connector</li>
+            <li><strong>Check for shorts</strong> - use a multimeter to test for continuity between positive and
+              negative</li>
+            <li><strong>Look for corrosion</strong> - on terminals, connectors, and wiring</li>
+            <li><strong>Check BMS status</strong> - some BMS units have status LEDs or can be checked with a BMS app
+            </li>
+          </ul>
+          <p><strong>⚠️ DO NOT attempt recovery if:</strong></p>
+          <ul>
+            <li>Any cell is below 2.0V (severely damaged)</li>
+            <li>Battery is swollen or physically damaged</li>
+            <li>You smell any chemical odors</li>
+            <li>Battery gets hot during charging attempts</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="guide-item">
+        <summary>Jumpstarting Methods (Advanced Users Only)</summary>
+        <div class="guide-content">
+          <p><strong>⚠️ WARNING: These methods can be dangerous. Only attempt if you understand the risks.</strong></p>
+
+          <h4>Method 1: BMS Wake-up (Safest)</h4>
+          <ul>
+            <li>Connect a <strong>low-current charger</strong> (0.1-0.5A) for 5-10 minutes</li>
+            <li>If BMS wakes up, switch to normal charging</li>
+            <li>Monitor temperature and voltage closely</li>
+          </ul>
+
+          <h4>Method 2: Parallel Charging (Advanced)</h4>
+          <ul>
+            <li>Connect a <strong>good battery in parallel</strong> (same voltage)</li>
+            <li>Let them balance for 30-60 minutes</li>
+            <li>Remove parallel connection and try normal charging</li>
+            <li><strong>Only if both batteries are the same voltage!</strong></li>
+          </ul>
+
+          <h4>Method 3: Direct Cell Charging (Expert Only)</h4>
+          <ul>
+            <li>Access individual cells through BMS balance connector</li>
+            <li>Charge each cell individually to 3.0V minimum</li>
+            <li>Use a <strong>very low current</strong> (0.1A max)</li>
+            <li><strong>Extremely dangerous - not recommended for beginners</strong></li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="guide-item">
+        <summary>BMS Troubleshooting</summary>
+        <div class="guide-content">
+          <h4>Common BMS Issues:</h4>
+          <ul>
+            <li><strong>Over-discharge protection</strong> - BMS cuts off at low voltage to protect cells</li>
+            <li><strong>Over-current protection</strong> - BMS cuts off during high current draw</li>
+            <li><strong>Temperature protection</strong> - BMS cuts off if too hot or too cold</li>
+            <li><strong>Cell imbalance</strong> - BMS prevents charging if cells are too different</li>
+            <li><strong>Communication error</strong> - BMS can't communicate with controller</li>
+          </ul>
+
+          <h4>BMS Reset Methods:</h4>
+          <ul>
+            <li><strong>Disconnect and reconnect</strong> - unplug BMS for 30 seconds</li>
+            <li><strong>Charge trigger</strong> - connect charger to wake up BMS</li>
+            <li><strong>Load trigger</strong> - connect a small load (like a light bulb) to activate BMS</li>
+            <li><strong>BMS app</strong> - some BMS units can be reset via smartphone app</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="guide-item">
+        <summary>When to Give Up - Battery is Toast</summary>
+        <div class="guide-content">
+          <p><strong>Your battery is likely beyond recovery if:</strong></p>
+          <ul>
+            <li>Voltage has been below 2.0V per cell for weeks/months</li>
+            <li>Cells are severely swollen or physically damaged</li>
+            <li>BMS shows error codes that won't clear</li>
+            <li>Battery gets hot during any charging attempt</li>
+            <li>Multiple jumpstart attempts have failed</li>
+            <li>You smell any chemical odors (electrolyte leakage)</li>
+          </ul>
+
+          <p><strong>Disposal:</strong></p>
+          <ul>
+            <li>Take to a <strong>proper battery recycling center</strong></li>
+            <li>Never throw lithium batteries in regular trash</li>
+            <li>Some electronics stores accept them for recycling</li>
+            <li>Check local regulations for lithium battery disposal</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="guide-item">
+        <summary>Prevention - Keep Your Battery Healthy</summary>
+        <div class="guide-content">
+          <ul>
+            <li><strong>Never let voltage drop below 3.0V per cell</strong> (use this calculator to monitor)</li>
+            <li><strong>Charge regularly</strong> - don't let it sit discharged for weeks</li>
+            <li><strong>Store at 40-60% charge</strong> in a cool, dry place</li>
+            <li><strong>Use the correct charger</strong> - wrong voltage can damage BMS</li>
+            <li><strong>Check connections regularly</strong> - loose connections cause voltage drops</li>
+            <li><strong>Balance charge monthly</strong> - charge to 100% occasionally to let BMS balance cells</li>
           </ul>
         </div>
       </details>
