@@ -579,8 +579,6 @@ function addInputValidation() {
 
 // Camera OCR functionality
 let cameraStream = null;
-let autoScanInterval = null;
-let lastDetectedVoltage = null;
 
 async function openCamera() {
   const modal = document.getElementById('cameraModal');
@@ -599,13 +597,8 @@ async function openCamera() {
     
     video.srcObject = cameraStream;
     modal.classList.add('active');
-    result.innerHTML = '🔍 Looking for voltage display...';
+    result.innerHTML = '';
     result.className = 'scan-result';
-    
-    // Start auto-scanning after camera loads
-    video.onloadedmetadata = () => {
-      startAutoCapture();
-    };
     
   } catch (error) {
     alert('Camera access denied or not available. Please allow camera access and try again.');
@@ -616,9 +609,6 @@ function closeCamera() {
   const modal = document.getElementById('cameraModal');
   const video = document.getElementById('cameraVideo');
   
-  // Stop auto-scanning
-  stopAutoCapture();
-  
   if (cameraStream) {
     cameraStream.getTracks().forEach(track => track.stop());
     cameraStream = null;
@@ -628,162 +618,49 @@ function closeCamera() {
   modal.classList.remove('active');
 }
 
-function startAutoCapture() {
-  const result = document.getElementById('scanResult');
-  result.innerHTML = '🔍 Auto-scanning for voltage...';
-  result.className = 'scan-result';
-  
-  // Scan every 2 seconds
-  autoScanInterval = setInterval(async () => {
-    await performAutoScan();
-  }, 2000);
-}
-
-function stopAutoCapture() {
-  if (autoScanInterval) {
-    clearInterval(autoScanInterval);
-    autoScanInterval = null;
-  }
-  lastDetectedVoltage = null;
-}
-
-async function performAutoScan() {
+async function captureAndAnalyze() {
   const video = document.getElementById('cameraVideo');
   const canvas = document.getElementById('captureCanvas');
   const result = document.getElementById('scanResult');
   
-  if (!video.videoWidth || !video.videoHeight) return;
-  
   try {
     // Set canvas size to match video
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
     
-    // Capture current frame
+    // Capture the current frame
     const ctx = canvas.getContext('2d');
     ctx.drawImage(video, 0, 0);
     
-    // Convert to data URL for OCR
-    const imageData = canvas.toDataURL('image/jpeg', 0.6);
+    result.innerHTML = 'Analyzing image with OCR...';
+    result.className = 'scan-result';
     
-    // Quick OCR check
-    const voltage = await performQuickOCR(imageData);
+    // Convert canvas to data URL and send to OCR API
+    const imageData = canvas.toDataURL('image/jpeg', 0.8);
     
-    if (voltage && voltage !== lastDetectedVoltage) {
-      // New voltage detected!
-      lastDetectedVoltage = voltage;
-      result.innerHTML = `✅ Auto-detected: ${voltage}V - Click "Save Voltage" to use this reading`;
+    // Try OCR.Space API (free tier)
+    const ocrResult = await performOCR(imageData);
+    
+    if (ocrResult) {
+      // Success - set the voltage and close camera
+      voltageInput.value = ocrResult;
+      updateBattery();
+      result.innerHTML = `✅ Found voltage: ${ocrResult}V`;
       result.className = 'scan-result success';
       
-      // Store the detected voltage for the save button
-      window.detectedVoltage = voltage;
-      
-    } else if (voltage === lastDetectedVoltage) {
-      // Same voltage detected - stable reading
-      result.innerHTML = `🎯 Stable reading: ${voltage}V - Click "Save Voltage" to confirm`;
-      result.className = 'scan-result success';
+      // Close camera after short delay
+      setTimeout(() => {
+        closeCamera();
+      }, 1500);
       
     } else {
-      // No voltage detected
-      result.innerHTML = '🔍 Auto-scanning... Position multimeter display in view';
-      result.className = 'scan-result';
-    }
-    
-  } catch (error) {
-    // Silent fail during auto-scanning
-  }
-}
-
-async function performQuickOCR(imageData) {
-  try {
-    const response = await fetch(imageData);
-    const blob = await response.blob();
-    
-    const formData = new FormData();
-    formData.append('file', blob, 'image.jpg');
-    formData.append('apikey', 'helloworld');
-    formData.append('OCREngine', '1'); // Faster engine for live detection
-    formData.append('scale', 'true');
-    
-    const ocrResponse = await fetch('https://api.ocr.space/parse/image', {
-      method: 'POST',
-      body: formData
-    });
-    
-    const ocrData = await ocrResponse.json();
-    
-    if (ocrData.OCRExitCode === 1 && ocrData.ParsedResults?.[0]?.ParsedText) {
-      const text = ocrData.ParsedResults[0].ParsedText;
-      return extractVoltageFromText(text);
-    }
-    
-    return null;
-    
-  } catch (error) {
-    return null;
-  }
-}
-
-async function captureAndAnalyze() {
-  const result = document.getElementById('scanResult');
-  
-  // Check if we have an auto-detected voltage
-  if (window.detectedVoltage) {
-    // Use the auto-detected voltage
-    voltageInput.value = window.detectedVoltage;
-    updateBattery();
-    result.innerHTML = `✅ Saved voltage: ${window.detectedVoltage}V`;
-    result.className = 'scan-result success';
-    
-    // Close camera after short delay
-    setTimeout(() => {
-      closeCamera();
-    }, 1000);
-    
-  } else {
-    // No auto-detected voltage, try manual OCR
-    const video = document.getElementById('cameraVideo');
-    const canvas = document.getElementById('captureCanvas');
-    
-    try {
-      // Set canvas size to match video
-      canvas.width = video.videoWidth || 640;
-      canvas.height = video.videoHeight || 480;
-      
-      // Capture the current frame
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0);
-      
-      result.innerHTML = 'Analyzing image with OCR...';
-      result.className = 'scan-result';
-      
-      // Convert canvas to data URL and send to OCR API
-      const imageData = canvas.toDataURL('image/jpeg', 0.8);
-      
-      // Try OCR.Space API with better settings
-      const ocrResult = await performOCR(imageData);
-      
-      if (ocrResult) {
-        // Success - set the voltage and close camera
-        voltageInput.value = ocrResult;
-        updateBattery();
-        result.innerHTML = `✅ Found voltage: ${ocrResult}V`;
-        result.className = 'scan-result success';
-        
-        // Close camera after short delay
-        setTimeout(() => {
-          closeCamera();
-        }, 1500);
-        
-      } else {
-        // Show manual fallback
-        showManualInput(result);
-      }
-      
-    } catch (error) {
-      // Show manual fallback on error
+      // Show manual fallback
       showManualInput(result);
     }
+    
+  } catch (error) {
+    // Show manual fallback on error
+    showManualInput(result);
   }
 }
 
