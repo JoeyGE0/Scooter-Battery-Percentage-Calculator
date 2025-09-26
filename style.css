@@ -26,6 +26,30 @@
   }
 }
 
+/* Camera button at bottom of page */
+.camera-btn-bottom {
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.camera-btn-bottom:hover {
+  background: var(--primary-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.camera-btn-bottom:active {
+  transform: translateY(0);
+}
+
 :root {
   --primary: #667eea;
   --primary-dark: #5a67d8;
@@ -54,6 +78,17 @@ body {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   width: 100%;
+
+  /* Fix overscroll/pull-to-refresh colors for mobile */
+  overscroll-behavior: none;
+  -webkit-overscroll-behavior: none;
+}
+
+/* Fix mobile overscroll background */
+html {
+  background: #0f0f23;
+  overscroll-behavior: none;
+  -webkit-overscroll-behavior: none;
 }
 
 body::before {
@@ -98,7 +133,7 @@ body::before {
   background: linear-gradient(180deg, rgba(26, 26, 46, 0.8) 0%, rgba(26, 26, 46, 0.4) 100%);
   backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--border);
-  padding: 2.5rem 0;
+  padding: 1.5rem 0;
   text-align: center;
   position: relative;
 }
@@ -115,7 +150,7 @@ body::before {
 }
 
 .header h1 {
-  font-size: 3rem;
+  font-size: 2.2rem;
   font-weight: 800;
   background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
   -webkit-background-clip: text;
@@ -1285,11 +1320,25 @@ body::before {
 
   .tip-card {
     padding: 1rem;
+    margin: 0 0.5rem;
+    border-radius: 12px;
+  }
+
+  .tip-title {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .tip-text {
+    font-size: 0.9rem;
+    line-height: 1.5;
   }
 
   .troubleshoot-btn {
     font-size: 0.85rem;
     padding: 0.6rem 1rem;
+    margin-top: 0.75rem;
+    width: 100%;
   }
 }
 
@@ -1353,14 +1402,18 @@ body::before {
 
   .tip-card {
     padding: 0.75rem;
+    margin: 0 0.25rem;
+    border-radius: 10px;
   }
 
   .tip-title {
     font-size: 1rem;
+    margin-bottom: 0.5rem;
   }
 
   .tip-text {
     font-size: 0.85rem;
+    line-height: 1.4;
   }
 }
 
