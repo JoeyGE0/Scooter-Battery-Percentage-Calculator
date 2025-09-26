@@ -40,17 +40,22 @@ const batteryConfigs = {
 
 // Initialize the app
 function init() {
+  loadSettings(); // Load settings FIRST before any updates
   updateBattery();
   generateReferenceGrid();
-  loadSettings();
   
   // Add event listeners
   voltageInput.addEventListener("input", updateBattery);
+  
+  // Add contenteditable functionality to voltage display
+  setupEditableVoltageDisplay();
   batteryType.addEventListener("change", () => {
     // Clear current voltage when switching battery types
     voltageInput.value = "";
     updateBattery();
     updateVoltagePlaceholder();
+    // Save settings immediately when battery type changes
+    saveSettings();
   });
   cellMax.addEventListener("input", updateBattery);
   cellNominal.addEventListener("input", updateBattery);
@@ -81,14 +86,39 @@ function updateVoltagePlaceholder() {
 
 // Update voltage input styling for dangerous undercharge
 function updateVoltageInputStyling(voltage, vMin, vMax) {
-  // Check for dangerously low voltage (same thresholds as the tips)
-  const isDangerouslyLow = voltage < vMin * 0.90 || voltage < vMax * 0.25;
+  // Get current battery config for research-based thresholds
+  const config = batteryConfigs[parseInt(batteryType.value)];
+  const cells = config.cells;
   
-  if (isDangerouslyLow) {
-    // Red outline with pulsing for dangerous undercharge
-    voltageInput.style.borderColor = "#f56565";
-    voltageInput.style.boxShadow = "0 0 0 4px rgba(245, 101, 101, 0.3), 0 0 20px rgba(245, 101, 101, 0.5)";
+  // Research-based voltage thresholds
+  const maxSafeVoltage = cells * 4.2; // 4.2V per cell = 100% safe maximum
+  const moderateDangerVoltage = cells * 4.3; // 4.3V per cell = high pressure, gas generation
+  const fireRiskVoltage = cells * 4.5; // 4.5V per cell = severe thermal runaway risk
+  const minSafeVoltage = cells * 3.0; // 3.0V per cell = safe minimum
+  const damageVoltage = cells * 2.5; // 2.5V per cell = damage threshold
+  
+  // Check for dangerous states
+  const isDangerouslyOvercharged = voltage >= fireRiskVoltage;
+  const isModerateDanger = voltage >= moderateDangerVoltage;
+  const isOvercharged = voltage > maxSafeVoltage;
+  const isCriticallyLow = voltage <= damageVoltage && voltage > 0;
+  const isDangerouslyLow = voltage < minSafeVoltage && voltage > damageVoltage;
+  
+  if (isDangerouslyOvercharged || isCriticallyLow) {
+    // Dark red outline with intense pulsing for extreme danger
+    voltageInput.style.borderColor = "#dc3545";
+    voltageInput.style.boxShadow = "0 0 0 4px rgba(220, 53, 69, 0.4), 0 0 25px rgba(220, 53, 69, 0.6)";
+    voltageInput.style.animation = "dangerPulse 0.8s infinite";
+  } else if (isModerateDanger || isDangerouslyLow) {
+    // Red outline with pulsing for dangerous states
+    voltageInput.style.borderColor = "#cc0000";
+    voltageInput.style.boxShadow = "0 0 0 4px rgba(204, 0, 0, 0.3), 0 0 20px rgba(204, 0, 0, 0.5)";
     voltageInput.style.animation = "dangerPulse 1s infinite";
+  } else if (isOvercharged) {
+    // Orange outline for basic overcharge
+    voltageInput.style.borderColor = "#ff8c00";
+    voltageInput.style.boxShadow = "0 0 0 4px rgba(255, 140, 0, 0.3), 0 0 15px rgba(255, 140, 0, 0.4)";
+    voltageInput.style.animation = "dangerPulse 1.2s infinite";
   } else {
     // Normal - reset styling
     voltageInput.style.borderColor = "";
@@ -131,18 +161,23 @@ function updateBattery() {
   // If set, it becomes the "0%" point even if battery has more voltage left
   const vMin = cutoff > 0 ? cutoff : cells * minCell;
   
-  // Update voltage display
-  if (!isNaN(voltage)) {
-    // Preserve original precision from input, but limit to 3 decimal places max
-    const originalValue = voltageInput.value;
-    if (originalValue && originalValue.includes('.')) {
-      const decimalPlaces = Math.min(3, originalValue.split('.')[1].length);
-      voltageDisplay.textContent = `${voltage.toFixed(decimalPlaces)}V`;
+  // Update voltage display (only if not currently being edited)
+  const editableDisplay = document.querySelector('.voltage-value-editable');
+  const isCurrentlyEditing = editableDisplay && document.activeElement === editableDisplay;
+  
+  if (!isCurrentlyEditing) {
+    if (!isNaN(voltage)) {
+      // Preserve original precision from input, but limit to 3 decimal places max
+      const originalValue = voltageInput.value;
+      if (originalValue && originalValue.includes('.')) {
+        const decimalPlaces = Math.min(3, originalValue.split('.')[1].length);
+        voltageDisplay.textContent = `${voltage.toFixed(decimalPlaces)}V`;
+      } else {
+        voltageDisplay.textContent = `${voltage.toFixed(1)}V`;
+      }
     } else {
-      voltageDisplay.textContent = `${voltage.toFixed(1)}V`;
+      voltageDisplay.textContent = "-- V";
     }
-  } else {
-    voltageDisplay.textContent = "-- V";
   }
   
   // Calculate percentage using more accurate lithium battery curve
@@ -157,32 +192,34 @@ function updateBattery() {
       percent = 0;
       status = "Below minimum voltage";
     } else {
-      // More accurate lithium battery percentage calculation
-      // Uses a curve that better matches real lithium battery behavior
+      // Linear percentage calculation for lithium batteries
+      // More accurate than arbitrary curves without proper discharge data
       const voltageRange = vMax - vMin;
       const voltageRatio = (voltage - vMin) / voltageRange;
       
-      // Apply curve correction for lithium batteries
-      // Higher voltages (above 3.7V/cell) have steeper drops
-      // Lower voltages (below 3.7V/cell) have more gradual drops
-      let correctedRatio;
-      if (voltageRatio > 0.5) {
-        // Above 50% - steeper curve
-        correctedRatio = 0.5 + (voltageRatio - 0.5) * 1.2;
-      } else {
-        // Below 50% - more gradual curve
-        correctedRatio = voltageRatio * 0.8;
-      }
-      
-      percent = Math.min(Math.max(correctedRatio * 100, 0), 100);
+      // Use simple linear interpolation - most accurate without specific discharge curve data
+      // Real lithium curves vary significantly by chemistry, temperature, and age
+      percent = Math.min(Math.max(voltageRatio * 100, 0), 100);
       status = getStatusText(percent, voltage, vNominal);
     }
   }
   
   // Update battery visual
   batteryFill.style.width = `${percent}%`;
-  batteryPercentText.textContent = `${Math.round(percent)}%`;
+  batteryPercentText.textContent = `${percent % 1 === 0 ? Math.round(percent) : percent.toFixed(1)}%`;
   statusText.textContent = status;
+  
+  // Update status pill styling based on battery level
+  statusText.className = 'status-text';
+  if (percent >= 80) {
+    statusText.classList.add('success');
+  } else if (percent >= 20) {
+    // Default styling (no additional class)
+  } else if (percent >= 10) {
+    statusText.classList.add('warning');
+  } else if (percent > 0) {
+    statusText.classList.add('danger');
+  }
   
   // Update battery color based on percentage
   updateBatteryColor(percent);
@@ -240,13 +277,155 @@ function updateBatteryColor(percent) {
     lightness = 55;
   }
   
-  batteryFill.style.background = `linear-gradient(90deg, hsl(${hue}, ${saturation}%, ${lightness}%), hsl(${hue + 20}, ${saturation}%, ${lightness + 5}%))`;
+  // Check for overcharged/undercharged conditions
+  const voltage = parseFloat(voltageInput.value);
+  const hasVoltageEntered = !isNaN(voltage) && voltageInput.value.trim() !== '';
+  const config = batteryConfigs[parseInt(batteryType.value)];
+  const cells = config.cells;
+  // Research-based voltage thresholds for lithium batteries
+  const maxSafeVoltage = cells * 4.2; // 4.2V per cell = 100% safe maximum
+  const moderateDangerVoltage = cells * 4.3; // 4.3V per cell = high pressure, gas generation
+  const fireRiskVoltage = cells * 4.5; // 4.5V per cell = severe thermal runaway risk
+  const minSafeVoltage = cells * 3.0; // 3.0V per cell = safe minimum
+  const damageVoltage = cells * 2.5; // 2.5V per cell = damage threshold
+  
+  let isOvercharged = false;
+  let isModerateDanger = false;
+  let isDangerouslyOvercharged = false;
+  let isDangerouslyLow = false;
+  let isCriticallyLow = false;
+  let isUnknown = false;
+  let warningIcon = '';
+  
+  if (hasVoltageEntered) {
+    if (voltage <= 0) { // 0V or negative = unknown/no reading (actively entered)
+      isUnknown = true;
+      warningIcon = 'question'; // Unknown status
+    } else if (voltage >= fireRiskVoltage) { // >=4.5V per cell = SEVERE FIRE DANGER
+      isDangerouslyOvercharged = true;
+      warningIcon = 'fire'; // Severe thermal runaway risk
+    } else if (voltage >= moderateDangerVoltage) { // >=4.3V per cell = moderate danger
+      isModerateDanger = true;
+      warningIcon = 'triangle'; // High pressure, gas generation
+    } else if (voltage > maxSafeVoltage) { // >4.2V per cell = overcharge
+      isOvercharged = true;
+      warningIcon = 'triangle'; // Basic overcharge warning
+    } else if (voltage <= damageVoltage) { // <=2.5V per cell = severe damage
+      isCriticallyLow = true;
+      warningIcon = 'triangle'; // Critical damage risk (NOT fire)
+    } else if (voltage < minSafeVoltage) { // <3.0V per cell = undercharge
+      isDangerouslyLow = true;
+      warningIcon = 'triangle'; // Undercharge warning
+    }
+  }
+  // No icon when field is empty - just show normal empty battery
+  
+  // Remove existing warning icon from battery body
+  const batteryBody = document.querySelector('.battery-body');
+  const existingIcon = batteryBody.querySelector('.battery-warning-icon');
+  if (existingIcon) {
+    existingIcon.remove();
+  }
+  
+  // Apple-style dynamic battery colors and text
+  if (isDangerouslyOvercharged) {
+    // EXTREME RED for dangerously overcharged - fire risk
+    batteryFill.style.background = 'linear-gradient(90deg, #dc143c, #8b0000)'; // Dark red
+    batteryPercentText.style.color = '#dc143c'; // Dark red text
+    // Add fire icon to battery body
+    const icon = document.createElement('div');
+    icon.className = 'battery-warning-icon fire-danger';
+    icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="fire-icon" viewBox="0 0 16 16">
+      <path d="M8 16c3.314 0 6-2 6-5.5 0-1.5-.5-4-2.5-6 .25 1.5-1.25 2-1.25 2C11 4 9 .5 6 0c.357 2 .5 4-2 6-1.25 1-2 2.729-2 4.5C2 14 4.686 16 8 16m0-1c-1.657 0-3-1-3-2.75 0-.75.25-2 1.25-3C6.125 10 7 10.5 7 10.5c-.375-1.25.5-3.25 2-3.5-.179 1-.25 2 1 3 .625.5 1 1.364 1 2.25C11 14 9.657 15 8 15"/>
+    </svg>`;
+    batteryBody.appendChild(icon);
+  } else if (isUnknown) {
+    // Default colors for unknown/0V
+    batteryPercentText.style.color = '#f2f2f7'; // White text
+    // Add question mark icon to battery body
+    const icon = document.createElement('div');
+    icon.className = 'battery-warning-icon unknown';
+    icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="question-mark" viewBox="0 0 16 16">
+      <path d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94"/>
+    </svg>`;
+    batteryBody.appendChild(icon);
+  } else if (isModerateDanger) {
+    // DARK RED for moderate danger (4.3V per cell - high pressure, gas generation)
+    batteryFill.style.background = 'linear-gradient(90deg, #cc0000, #ff3b30)'; // Dark red gradient
+    batteryPercentText.style.color = '#cc0000'; // Dark red text
+    // Add warning icon to battery body
+    const icon = document.createElement('div');
+    icon.className = 'battery-warning-icon moderate-danger';
+    icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="warning-triangle" viewBox="0 0 16 16">
+      <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5m.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/>
+    </svg>`;
+    batteryBody.appendChild(icon);
+  } else if (isOvercharged) {
+    // ORANGE for basic overcharge (4.2V+ per cell)
+    batteryFill.style.background = 'linear-gradient(90deg, #ff8c00, #ff6600)'; // Orange gradient
+    batteryPercentText.style.color = '#ff8c00'; // Orange text
+    // Add warning icon to battery body
+    const icon = document.createElement('div');
+    icon.className = 'battery-warning-icon overcharge';
+    icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="warning-triangle" viewBox="0 0 16 16">
+      <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5m.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/>
+    </svg>`;
+    batteryBody.appendChild(icon);
+  } else if (isCriticallyLow) {
+    // WARNING TRIANGLE for critically low (<=2.5V per cell - severe damage risk, NOT fire)
+    batteryFill.style.background = 'linear-gradient(90deg, #8b0000, #ff0000)'; // Dark red gradient
+    batteryPercentText.style.color = '#ff0000'; // Bright red text
+    // Add warning triangle icon to battery body
+    const icon = document.createElement('div');
+    icon.className = 'battery-warning-icon critical-low';
+    icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="warning-triangle" viewBox="0 0 16 16">
+      <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5m.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/>
+    </svg>`;
+    batteryBody.appendChild(icon);
+  } else if (isDangerouslyLow) {
+    // RED for dangerously low
+    batteryFill.style.background = 'linear-gradient(90deg, #ff453a, #ff3b30)'; // Bright red
+    batteryPercentText.style.color = '#ff453a'; // Red text
+    // Add warning icon to battery body
+    const icon = document.createElement('div');
+    icon.className = 'battery-warning-icon danger';
+    icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="warning-triangle" viewBox="0 0 16 16">
+      <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5m.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/>
+    </svg>`;
+    batteryBody.appendChild(icon);
+  } else if (percent >= 80) {
+    batteryFill.style.background = 'linear-gradient(90deg, #30d158, #32d74b)'; // Green
+    batteryPercentText.style.color = '#30d158'; // Green text
+  } else if (percent >= 50) {
+    batteryFill.style.background = 'linear-gradient(90deg, #32d74b, #ffcc02)'; // Light green to yellow
+    batteryPercentText.style.color = '#32d74b'; // Light green text
+  } else if (percent >= 20) {
+    batteryFill.style.background = 'linear-gradient(90deg, #ffcc02, #ff9500)'; // Yellow to orange
+    batteryPercentText.style.color = '#ffcc02'; // Yellow text
+  } else if (percent > 0) {
+    batteryFill.style.background = 'linear-gradient(90deg, #ff9500, #ff453a)'; // Orange to red
+    batteryPercentText.style.color = '#ff453a'; // Red text
+  } else {
+    // Default white when no voltage entered
+    batteryPercentText.style.color = '#f2f2f7'; // White text
+  }
 }
 
 // Update tips based on battery state
 function updateTips(voltage, percent, vMin, vMax, vNominal) {
   let icon, title, text, type = "info";
   let showTroubleshootButton = false;
+  
+  // Get current battery config for research-based thresholds
+  const config = batteryConfigs[parseInt(batteryType.value)];
+  const cells = config.cells;
+  
+  // Research-based voltage thresholds
+  const maxSafeVoltage = cells * 4.2; // 4.2V per cell = 100% safe maximum
+  const moderateDangerVoltage = cells * 4.3; // 4.3V per cell = high pressure, gas generation
+  const fireRiskVoltage = cells * 4.5; // 4.5V per cell = severe thermal runaway risk
+  const minSafeVoltage = cells * 3.0; // 3.0V per cell = safe minimum
+  const damageVoltage = cells * 2.5; // 2.5V per cell = damage threshold
   
   if (isNaN(voltage)) {
     icon = "💡";
@@ -263,21 +442,33 @@ function updateTips(voltage, percent, vMin, vMax, vNominal) {
     title = "DANGER - Extremely high voltage";
     text = "This voltage is dangerously high and could cause fire or explosion. DO NOT charge. Check for wiring issues or wrong battery type.";
     type = "warning";
-  } else if (voltage > vMax * 1.08) {
+  } else if (voltage >= fireRiskVoltage) {
     icon = "🚨";
-    title = "DANGER - Severely overcharged";
-    text = "Voltage is dangerously high. This could damage your battery permanently or cause a fire. DO NOT charge. Check your battery type.";
+    title = "EXTREME DANGER - Fire Risk";
+    text = `Voltage is ${(voltage/cells).toFixed(2)}V per cell (≥4.5V limit). SEVERE thermal runaway risk! DO NOT charge. Disconnect immediately and move to safe area.`;
     type = "warning";
-  } else if (voltage > vMax * 1.05) {
+  } else if (voltage >= moderateDangerVoltage) {
     icon = "🚨";
-    title = "DANGER - Overcharged";
-    text = "Voltage exceeds safe maximum. This could damage your battery. Unplug immediately and let rest. Check charger output.";
+    title = "DANGER - High Pressure";
+    text = `Voltage is ${(voltage/cells).toFixed(2)}V per cell (≥4.3V). Battery under high pressure, gas generation likely. Stop charging immediately.`;
     type = "warning";
-  } else if (voltage > vMax * 1.02) {
+  } else if (voltage > maxSafeVoltage) {
     icon = "⚠️";
-    title = "Above full charge";
-    text = "Voltage is slightly above full charge. This is often surface charge after charging. Let rest 15-30 min; voltage should settle.";
+    title = "OVERCHARGED - Stop charging";
+    text = `Voltage is ${(voltage/cells).toFixed(2)}V per cell (>4.2V safe limit). Stop charging immediately to prevent damage.`;
     type = "warning";
+  } else if (voltage <= damageVoltage && voltage > 0) {
+    icon = "🚨";
+    title = "CRITICAL - Severe undercharge";
+    text = `Voltage is ${(voltage/cells).toFixed(2)}V per cell (≤${2.5}V damage threshold). Battery may be permanently damaged. Use extreme caution.`;
+    type = "warning";
+    showTroubleshootButton = true;
+  } else if (voltage < minSafeVoltage) {
+    icon = "🚨";
+    title = "DANGER - Undercharged";
+    text = `Voltage is ${(voltage/cells).toFixed(2)}V per cell (<${3.0}V safe minimum). Battery may be damaged if left this low. Charge carefully.`;
+    type = "warning";
+    showTroubleshootButton = true;
   } else if (voltage >= vMax * 0.98) {
     icon = "✅";
     title = "Fully charged";
@@ -298,30 +489,30 @@ function updateTips(voltage, percent, vMin, vMax, vNominal) {
     title = "Moderate charge";
     text = "Battery has moderate charge. Fine for shorter rides, but consider charging soon.";
     type = "info";
-  } else if (voltage >= vMax * 0.70) {
+  } else if (voltage >= vMax * 0.60) {
     icon = "📉";
     title = "Below half";
     text = "Battery is below half charge. Plan your route accordingly and charge soon.";
     type = "info";
-  } else if (voltage >= vMax * 0.62) {
+  } else if (voltage >= vMax * 0.40) {
+    icon = "🏠";
+    title = "Storage range";
+    text = "Perfect storage voltage (40-60%)! Ideal for long-term storage to preserve battery health.";
+    type = "info";
+  } else if (voltage >= vMax * 0.25) {
     icon = "⚠️";
     title = "Low charge";
-    text = "Battery is getting low. Consider charging soon to avoid deep discharge.";
+    text = "Battery getting low. Range will be significantly reduced - consider charging soon.";
     type = "warning";
-  } else if (voltage >= vMax * 0.55) {
-    icon = "⚠️";
-    title = "Very low charge";
-    text = "Battery is very low. Charge soon to prevent controller cutoff and cell damage.";
-    type = "warning";
-  } else if (voltage >= vMax * 0.48) {
+  } else if (voltage >= vMax * 0.20) {
     icon = "🔋";
     title = "Critical charge";
-    text = "Battery is critically low. Charge immediately to prevent controller cutoff.";
+    text = "Battery critically low. Power cutoff may occur soon - charge as soon as possible.";
     type = "warning";
-  } else if (voltage >= vMax * 0.40) {
+  } else if (voltage >= vMax * 0.05) {
     icon = "🚨";
-    title = "Extremely low";
-    text = "Battery is extremely low. Charge NOW to prevent permanent cell damage.";
+    title = "Emergency low";
+    text = "Emergency battery level. System shutdown imminent - charge immediately.";
     type = "warning";
   } else if (voltage >= vMax * 0.32) {
     icon = "🚨";
@@ -1017,6 +1208,125 @@ function isValidVoltage(voltage) {
   }
   
   return true;
+}
+
+// Helper function to detect valid battery voltages for current battery type
+function isValidBatteryVoltage(voltage) {
+  if (isNaN(voltage) || voltage <= 0) return false;
+  
+  // Get current battery type range
+  const currentBatteryType = parseInt(document.getElementById('batteryType').value);
+  const config = batteryConfigs[currentBatteryType];
+  if (!config) return false;
+  
+  const cells = config.cells;
+  // Use lenient ranges for live validation (wider than safety thresholds)
+  const minVoltage = cells * 2.0;  // Very damaged but still a valid reading
+  const maxVoltage = cells * 4.5;  // Extremely overcharged but still a valid reading
+  
+  return voltage >= minVoltage && voltage <= maxVoltage;
+}
+
+// Setup editable voltage display functionality
+function setupEditableVoltageDisplay() {
+  const editableDisplay = document.querySelector('.voltage-value-editable');
+  let isEditing = false;
+  
+  // Handle focus - start editing mode
+  editableDisplay.addEventListener('focus', function() {
+    isEditing = true;
+    const voltage = parseFloat(voltageInput.value);
+    if (!isNaN(voltage)) {
+      // Show just the number when editing
+      this.textContent = voltage.toString();
+    } else {
+      this.textContent = '';
+    }
+  });
+  
+  // Handle input events - live update when valid voltage for current battery type
+  editableDisplay.addEventListener('input', function() {
+    if (!isEditing) return;
+    
+    const text = this.textContent.trim();
+    // Extract numbers from the text
+    const numberMatch = text.match(/^[\d\.]*$/);
+    if (numberMatch && text !== '') {
+      const voltage = parseFloat(text);
+      if (!isNaN(voltage)) {
+        voltageInput.value = voltage;
+        
+        // Live update if it's a valid voltage for current battery type
+        if (isValidBatteryVoltage(voltage)) {
+          updateBattery(); // Update live!
+        }
+      }
+    } else if (text === '') {
+      voltageInput.value = '';
+    }
+  });
+  
+  // Handle paste events
+  editableDisplay.addEventListener('paste', function(e) {
+    e.preventDefault();
+    const paste = (e.clipboardData || window.clipboardData).getData('text');
+    const numberMatch = paste.match(/[\d\.]+/);
+    if (numberMatch) {
+      const voltage = parseFloat(numberMatch[0]);
+      if (!isNaN(voltage)) {
+        this.textContent = voltage.toString();
+        voltageInput.value = voltage;
+      }
+    }
+  });
+  
+  // Handle key events
+  editableDisplay.addEventListener('keydown', function(e) {
+    // Allow: backspace, delete, tab, escape, enter, period, and numbers
+    if ([46, 8, 9, 27, 13, 110, 190].indexOf(e.keyCode) !== -1 ||
+        // Allow Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+        (e.keyCode === 65 && e.ctrlKey === true) ||
+        (e.keyCode === 67 && e.ctrlKey === true) ||
+        (e.keyCode === 86 && e.ctrlKey === true) ||
+        (e.keyCode === 88 && e.ctrlKey === true) ||
+        // Allow numbers 0-9
+        (e.keyCode >= 48 && e.keyCode <= 57) ||
+        // Allow numpad numbers 0-9
+        (e.keyCode >= 96 && e.keyCode <= 105)) {
+      return;
+    }
+    // Prevent other keys
+    e.preventDefault();
+  });
+  
+  // Handle enter key to finish editing
+  editableDisplay.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      this.blur();
+    }
+  });
+  
+  // Format on blur - stop editing mode
+  editableDisplay.addEventListener('blur', function() {
+    isEditing = false;
+    const voltage = parseFloat(voltageInput.value);
+    if (!isNaN(voltage)) {
+      // Format with proper precision
+      const originalValue = voltageInput.value;
+      if (originalValue && originalValue.includes('.')) {
+        const decimalPlaces = Math.min(3, originalValue.split('.')[1].length);
+        this.textContent = `${voltage.toFixed(decimalPlaces)}V`;
+      } else {
+        this.textContent = `${voltage.toFixed(1)}V`;
+      }
+      // Now update battery after editing is done
+      updateBattery();
+    } else {
+      this.textContent = '-- V';
+      updateBattery();
+    }
+  });
 }
 
 // Initialize when DOM is loaded
