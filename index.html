@@ -12,7 +12,7 @@
   <div class="app">
     <header class="header">
       <div class="container">
-        <h1>🔋 Battery Calculator</h1>
+        <h1>Battery Calculator</h1>
         <p class="subtitle">Convert your scooter's voltage to percentage with smart insights</p>
       </div>
     </header>
@@ -67,10 +67,6 @@
                   <div class="voltage-label">Current voltage</div>
                   <div class="voltage-value-editable" id="voltageDisplay" contenteditable="true"
                     data-placeholder="-- V">-- V</div>
-                  <button type="button" class="camera-btn-integrated" id="cameraBtn" onclick="openCamera()"
-                    title="Scan voltage from multimeter">
-                    📷
-                  </button>
                 </div>
                 <!-- Hidden input for form handling -->
                 <input type="number" id="voltageInput" step="0.1" style="display: none;" />
@@ -407,6 +403,14 @@
   </div>
   </div>
   </main>
+  </div>
+
+  <!-- Camera button moved to bottom -->
+  <div style="text-align: center; padding: 2rem 0; border-top: 1px solid rgba(255,255,255,0.1);">
+    <button type="button" class="camera-btn-bottom" id="cameraBtn" onclick="openCamera()"
+      title="Scan voltage from multimeter">
+      📷 Scan Voltage
+    </button>
   </div>
 
   <script src="script.js"></script>
