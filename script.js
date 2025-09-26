@@ -133,7 +133,14 @@ function updateBattery() {
   
   // Update voltage display
   if (!isNaN(voltage)) {
-    voltageDisplay.textContent = `${voltage.toFixed(1)}V`;
+    // Preserve original precision from input, but limit to 3 decimal places max
+    const originalValue = voltageInput.value;
+    if (originalValue && originalValue.includes('.')) {
+      const decimalPlaces = Math.min(3, originalValue.split('.')[1].length);
+      voltageDisplay.textContent = `${voltage.toFixed(decimalPlaces)}V`;
+    } else {
+      voltageDisplay.textContent = `${voltage.toFixed(1)}V`;
+    }
   } else {
     voltageDisplay.textContent = "-- V";
   }
