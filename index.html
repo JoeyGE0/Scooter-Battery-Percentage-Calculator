@@ -20,116 +20,98 @@
     <main class="main">
       <div class="container">
         <div class="main-content">
-          <div class="calculator-card">
-            <!-- Battery Type Selection -->
-            <div class="input-group">
-              <label for="batteryType">Battery Type</label>
-              <div class="select-wrapper">
-                <select id="batteryType">
-                  <option value="36">36V Battery</option>
-                  <option value="48">48V Battery</option>
-                  <option value="52">52V Battery</option>
-                  <option value="60">60V Battery</option>
-                  <option value="72" selected>72V Battery</option>
-                </select>
-              </div>
-            </div>
-
-            <!-- Voltage Input -->
-            <div class="input-group">
-              <label for="voltageInput">Current Voltage</label>
-              <div class="input-wrapper">
-                <input type="number" id="voltageInput" step="0.1" placeholder="e.g. 79.2" />
-                <span class="unit">V</span>
-                <button type="button" class="camera-btn" id="cameraBtn" onclick="openCamera()"
-                  title="Scan voltage from multimeter">
-                  📷
-                </button>
-              </div>
-            </div>
-
-            <!-- Hidden camera elements -->
-            <div id="cameraModal" class="camera-modal">
-              <div class="camera-content">
-                <div class="camera-header">
-                  <h3>📷 Scan Multimeter Display</h3>
-                  <button class="close-btn" onclick="closeCamera()">✕</button>
-                </div>
-                <div class="camera-preview">
-                  <video id="cameraVideo" autoplay playsinline></video>
-                  <canvas id="captureCanvas" style="display: none;"></canvas>
-                </div>
-                <div class="camera-instructions">
-                  <p>Position your multimeter display in the camera view and tap capture</p>
-                </div>
-                <div class="camera-controls">
-                  <button class="capture-btn" onclick="captureAndAnalyze()">💾 Save Voltage</button>
-                  <button class="cancel-btn" onclick="closeCamera()">Cancel</button>
-                </div>
-                <div id="scanResult" class="scan-result"></div>
-              </div>
-            </div>
-
-            <!-- Battery Display -->
-            <div class="battery-section">
-              <div class="battery-container">
-                <div class="battery">
-                  <div class="battery-fill" id="batteryFill">
-                    <span id="batteryPercent">0%</span>
+          <!-- Battery Status Display - Top Priority -->
+          <div class="battery-status-card">
+            <div class="battery-container">
+              <!-- Main Battery Widget -->
+              <div class="battery-widget">
+                <div class="battery-icon">
+                  <div class="battery-body">
+                    <div class="battery-level" id="batteryFill"></div>
                   </div>
                   <div class="battery-terminal"></div>
                 </div>
-                <div class="battery-info">
-                  <div class="voltage-display" id="voltageDisplay">-- V</div>
-                  <div class="status-text" id="statusText">Enter voltage to start</div>
-                </div>
+                <div class="battery-percentage" id="batteryPercent">0%</div>
               </div>
-            </div>
 
-            <!-- Advanced Settings -->
-            <div class="advanced-section">
-              <button class="advanced-toggle" id="advancedToggle" onclick="toggleAdvanced()">
-                <span class="toggle-icon">⚙️</span>
-                <span class="toggle-text">Advanced Settings</span>
-                <span class="toggle-arrow">▼</span>
-              </button>
-
-              <div class="advanced-panel" id="advancedPanel">
-                <div class="advanced-grid">
-                  <div class="input-group">
-                    <label for="cellMax">Max Cell Voltage</label>
-                    <input type="number" id="cellMax" value="4.2" step="0.01" />
-                  </div>
-                  <div class="input-group">
-                    <label for="cellNominal">Nominal Cell Voltage</label>
-                    <input type="number" id="cellNominal" value="3.7" step="0.01" />
-                  </div>
-                  <div class="input-group">
-                    <label for="cellMin">Min Cell Voltage</label>
-                    <input type="number" id="cellMin" value="3.0" step="0.01" />
-                  </div>
-                  <div class="input-group">
-                    <label for="controllerCutoff">Controller Cutoff (V)</label>
-                    <input type="number" id="controllerCutoff" value="0" step="0.1" placeholder="e.g. 60.0" />
-                    <small style="color: #a0aec0; font-size: 0.8rem; margin-top: 0.25rem; display: block;">
-                      Voltage when scooter stops (for accurate % calculation)
-                    </small>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Tips and Warnings -->
-            <div class="tips-section">
-              <div class="tip-card" id="tipCard">
-                <div class="tip-icon" id="tipIcon">💡</div>
-                <div class="tip-content">
-                  <div class="tip-title" id="tipTitle">Ready to calculate</div>
-                  <div class="tip-text" id="tipText">Enter your battery voltage above to get started</div>
+              <!-- Status Info -->
+              <div class="battery-status-info">
+                <div class="status-text" id="statusText">Enter voltage to start</div>
+                <div class="charge-time" id="chargeTime" style="display: none;">
+                  <span id="chargeTimeValue">2h 30m</span> until full
                 </div>
               </div>
             </div>
           </div>
+
+          <!-- Combined Input Card -->
+          <div class="input-card">
+            <div class="input-card-section">
+              <!-- Battery Type Section -->
+              <div class="battery-type-section">
+                <label for="batteryType" class="battery-type-label">Battery Type</label>
+                <div class="select-wrapper">
+                  <select id="batteryType">
+                    <option value="36">36V Battery</option>
+                    <option value="48">48V Battery</option>
+                    <option value="52">52V Battery</option>
+                    <option value="60">60V Battery</option>
+                    <option value="72">72V Battery</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Current Voltage Section -->
+              <div class="current-voltage-section">
+                <div class="voltage-display-container">
+                  <div class="voltage-label">Current voltage</div>
+                  <div class="voltage-value-editable" id="voltageDisplay" contenteditable="true"
+                    data-placeholder="-- V">-- V</div>
+                  <button type="button" class="camera-btn-integrated" id="cameraBtn" onclick="openCamera()"
+                    title="Scan voltage from multimeter">
+                    📷
+                  </button>
+                </div>
+                <!-- Hidden input for form handling -->
+                <input type="number" id="voltageInput" step="0.1" style="display: none;" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Tips and Notifications - Prominent Position -->
+          <div class="notifications-card">
+            <div class="tip-card" id="tipCard">
+              <div class="tip-icon" id="tipIcon">💡</div>
+              <div class="tip-content">
+                <div class="tip-title" id="tipTitle">Ready to calculate</div>
+                <div class="tip-text" id="tipText">Enter your battery voltage above to get started</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Hidden camera elements -->
+          <div id="cameraModal" class="camera-modal">
+            <div class="camera-content">
+              <div class="camera-header">
+                <h3>📷 Scan Multimeter Display</h3>
+                <button class="close-btn" onclick="closeCamera()">✕</button>
+              </div>
+              <div class="camera-preview">
+                <video id="cameraVideo" autoplay playsinline></video>
+                <canvas id="captureCanvas" style="display: none;"></canvas>
+              </div>
+              <div class="camera-instructions">
+                <p>Position your multimeter display in the camera view and tap capture</p>
+              </div>
+              <div class="camera-controls">
+                <button class="capture-btn" onclick="captureAndAnalyze()">💾 Save Voltage</button>
+                <button class="cancel-btn" onclick="closeCamera()">Cancel</button>
+              </div>
+              <div id="scanResult" class="scan-result"></div>
+            </div>
+          </div>
+
+          <!-- Reference and Guide Cards moved up here -->
         </div>
 
       </div>
@@ -303,20 +285,25 @@
             <li>Monitor temperature and voltage closely</li>
           </ul>
 
-          <h4>Method 2: Parallel Charging (Advanced)</h4>
+          <h4>⚠️ ADVANCED METHODS - PROCEED WITH EXTREME CAUTION</h4>
+          <p><strong>WARNING: These methods can cause fires, explosions, or toxic gas release. Only attempt if you have
+              proper safety equipment, ventilation, and understand the risks. Incorrectly performed, these can destroy
+              your battery or cause serious injury.</strong></p>
+
+          <h5>Parallel Charging (Requires Expert Knowledge)</h5>
           <ul>
-            <li>Connect a <strong>good battery in parallel</strong> (same voltage)</li>
-            <li>Let them balance for 30-60 minutes</li>
-            <li>Remove parallel connection and try normal charging</li>
-            <li><strong>Only if both batteries are the same voltage!</strong></li>
+            <li><strong>DANGER:</strong> Voltage mismatch can cause rapid discharge/fire</li>
+            <li>Requires precise voltage matching (within 0.1V)</li>
+            <li>Must use proper fusing and safety monitoring</li>
+            <li><strong>Not recommended - seek professional help instead</strong></li>
           </ul>
 
-          <h4>Method 3: Direct Cell Charging (Expert Only)</h4>
+          <h5>Direct Cell Access (Professionals Only)</h5>
           <ul>
-            <li>Access individual cells through BMS balance connector</li>
-            <li>Charge each cell individually to 3.0V minimum</li>
-            <li>Use a <strong>very low current</strong> (0.1A max)</li>
-            <li><strong>Extremely dangerous - not recommended for beginners</strong></li>
+            <li><strong>EXTREME DANGER:</strong> Bypasses all safety systems</li>
+            <li>Can cause immediate thermal runaway if done incorrectly</li>
+            <li>Requires specialized equipment and training</li>
+            <li><strong>NEVER attempt without professional supervision</strong></li>
           </ul>
         </div>
       </details>
@@ -370,7 +357,7 @@
         <summary>Prevention - Keep Your Battery Healthy</summary>
         <div class="guide-content">
           <ul>
-            <li><strong>Never let voltage drop below 3.0V per cell</strong> (use this calculator to monitor)</li>
+            <li><strong>Avoid deep discharge below 3.0V per cell</strong> (use this calculator to monitor)</li>
             <li><strong>Charge regularly</strong> - don't let it sit discharged for weeks</li>
             <li><strong>Store at 40-60% charge</strong> in a cool, dry place</li>
             <li><strong>Use the correct charger</strong> - wrong voltage can damage BMS</li>
@@ -381,6 +368,42 @@
       </details>
     </div>
   </div>
+
+  <!-- Advanced Settings - Bottom of Page -->
+  <div class="advanced-settings-card">
+    <div class="advanced-section">
+      <button class="advanced-toggle" id="advancedToggle" onclick="toggleAdvanced()">
+        <span class="toggle-icon">⚙️</span>
+        <span class="toggle-text">Advanced Settings</span>
+        <span class="toggle-arrow">▼</span>
+      </button>
+
+      <div class="advanced-panel" id="advancedPanel">
+        <div class="advanced-grid">
+          <div class="input-group">
+            <label for="cellMax">Max Cell Voltage</label>
+            <input type="number" id="cellMax" value="4.2" step="0.01" />
+          </div>
+          <div class="input-group">
+            <label for="cellNominal">Nominal Cell Voltage</label>
+            <input type="number" id="cellNominal" value="3.7" step="0.01" />
+          </div>
+          <div class="input-group">
+            <label for="cellMin">Min Cell Voltage</label>
+            <input type="number" id="cellMin" value="3.0" step="0.01" />
+          </div>
+          <div class="input-group">
+            <label for="controllerCutoff">Controller Cutoff (V)</label>
+            <input type="number" id="controllerCutoff" value="0" step="0.1" placeholder="e.g. 60.0" />
+            <small style="color: #a0aec0; font-size: 0.8rem; margin-top: 0.25rem; display: block;">
+              Voltage when scooter stops (for accurate % calculation)
+            </small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   </div>
   </div>
   </main>
